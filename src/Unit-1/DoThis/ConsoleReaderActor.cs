@@ -26,7 +26,7 @@ namespace WinTail
         // in ConsoleReadorActor, after OnReceive()
         private void DoPrintInstructions()
         {
-            Console.WriteLine("Please provide the URI of a log file on disk./n");
+            Console.WriteLine("Please provide the URI of a log file on disk. /n");
         }
 
         /// <summary>
