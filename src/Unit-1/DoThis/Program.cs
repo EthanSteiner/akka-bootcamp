@@ -2,14 +2,14 @@
 {
     using Akka.Actor;
 
-    internal class Program
+    class Program
     {
         public static ActorSystem MyActorSystem;
 
         private static void Main(string[] args)
         {
             // initialize MyActorSystem
-            MyActorSystem = ActorSystem.Create("myActorSystem");
+            MyActorSystem = ActorSystem.Create("MyActorSystem");
 
             Props consoleWriterProps = Props.Create(() => new ConsoleWriterActor());
             IActorRef consoleWriterActor = MyActorSystem.ActorOf(consoleWriterProps, "consoleWriterActor");
@@ -18,10 +18,10 @@
             Props tailCoordinatorProps = Props.Create(() => new TailCoordinatorActor());
             IActorRef tailCoordinatorActor = MyActorSystem.ActorOf(tailCoordinatorProps, "tailCoordinatorActor");
 
-            Props validationActorProps = Props.Create(() => new FileValidatorActor(consoleWriterActor, tailCoordinatorActor));
-            IActorRef validationActor = MyActorSystem.ActorOf(validationActorProps, "validationActor");
+            Props fileValidatorActorProps = Props.Create(() => new FileValidatorActor(consoleWriterActor));
+            IActorRef fileValidatorActor = MyActorSystem.ActorOf(fileValidatorActorProps, "validationActor");
 
-            Props consoleReaderProps = Props.Create<ConsoleReaderActor>(validationActor);
+            Props consoleReaderProps = Props.Create<ConsoleReaderActor>();
             IActorRef consoleReaderActor = MyActorSystem.ActorOf(consoleReaderProps, "consoleReaderActor");
 
             // tell console reader to begin

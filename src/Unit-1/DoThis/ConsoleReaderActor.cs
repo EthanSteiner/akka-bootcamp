@@ -11,12 +11,6 @@ namespace WinTail
     {
         public const string StartCommand = "Start";
         public const string ExitCommand = "exit";
-        private readonly IActorRef _validationActor;
-
-        public ConsoleReaderActor(IActorRef validationActor)
-        {
-            this._validationActor = validationActor;
-        }
 
         protected override void OnReceive(object message)
         {
@@ -28,12 +22,11 @@ namespace WinTail
             GetAndValidateInput();
         }
 
-        #region Internal methods
 
-        //in ConsoleReadorActor, after OnReceive()
+        // in ConsoleReadorActor, after OnReceive()
         private void DoPrintInstructions()
         {
-            Console.WriteLine("Please provide the URI of a log file on disk.|n");
+            Console.WriteLine("Please provide the URI of a log file on disk./n");
         }
 
         /// <summary>
@@ -51,10 +44,8 @@ namespace WinTail
                 return;
             }
 
-            // otherwise, just hand message off to validation acotr (by telling its actor ref)
-            _validationActor.Tell(message);
+            // otherwise, just hand message off for validation
+            Context.ActorSelection("akka://MyActorSystem/user/validationActor").Tell(message);
         }
-
-        #endregion
     }
 }
