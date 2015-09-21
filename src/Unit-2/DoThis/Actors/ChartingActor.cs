@@ -7,7 +7,7 @@
     using System.Windows.Forms.DataVisualization.Charting;
     using Akka.Actor;
 
-    public class ChartingActor : ReceiveActor
+    public class ChartingActor : ReceiveActor, IWithUnboundedStash
     {
         /// <summary>
         ///     Maximum number of points we will allow in a series
@@ -17,6 +17,7 @@
         private readonly Chart _chart;
         private readonly Button _pauseButton;
         private Dictionary<string, Series> _seriesIndex;
+        public IStash Stash { get; set; }
 
         /// <summary>
         ///     Incrementing counter we use to plot along the X-axis
@@ -54,13 +55,20 @@
 
         private void Paused()
         {
+            Receive<AddSeries>(addSeries => Stash.Stash());
+            Receive<RemoveSeries>(removeSeries => Stash.Stash());
             Receive<Metric>(metric => this.HandleMetricsPaused(metric));
             Receive<TogglePause>(
                                  pause =>
                                  {
                                      SetPauseButtonText(false);
                                      UnbecomeStacked();
+
+                                     //ChartingActor is leaving the Paused state, put messages back
+                                     //into mailbox for processing under new behavior
+                                     Stash.UnstashAll();
                                  });
+
         }
 
         private void HandleMetricsPaused(Metric metric)
