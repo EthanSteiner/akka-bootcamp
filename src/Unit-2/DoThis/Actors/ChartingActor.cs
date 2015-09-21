@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Windows.Forms;
     using System.Windows.Forms.DataVisualization.Charting;
     using Akka.Actor;
 
@@ -14,63 +15,67 @@
         public const int MaxPoints = 250;
 
         private readonly Chart _chart;
+        private readonly Button _pauseButton;
         private Dictionary<string, Series> _seriesIndex;
 
         /// <summary>
         ///     Incrementing counter we use to plot along the X-axis
         /// </summary>
-        private int xPosCounter = 0;
+        private int xPosCounter;
 
-        public ChartingActor(Chart chart)
-            : this(chart, new Dictionary<string, Series>())
+        public ChartingActor(Chart chart, Button pauseButton)
+            : this(chart, new Dictionary<string, Series>(), pauseButton)
         {
         }
 
-        public ChartingActor(Chart chart, Dictionary<string, Series> seriesIndex)
+        public ChartingActor(Chart chart, Dictionary<string, Series> seriesIndex, Button pauseButton)
         {
             _chart = chart;
             _seriesIndex = seriesIndex;
-
-            Receive<InitializeChart>(ic => HandleInitialize(ic));
-            Receive<AddSeries>(addSeries => HandleAddSeries(addSeries));
-            Receive<RemoveSeries>(removeSeries => HandleRemoveSeries(removeSeries));
-            Receive<Metric>(metric => HandleMetrics(metric));
+            _pauseButton = pauseButton;
+            Charting();
         }
 
-        public class InitializeChart
+        private void Charting()
         {
-            public InitializeChart(Dictionary<string, Series> initialSeries)
-            {
-                InitialSeries = initialSeries;
-            }
+            this.Receive<InitializeChart>(ic => this.HandleInitialize(ic));
+            this.Receive<AddSeries>(addSeries => this.HandleAddSeries(addSeries));
+            this.Receive<RemoveSeries>(removeSeries => this.HandleRemoveSeries(removeSeries));
+            this.Receive<Metric>(metric => this.HandleMetrics(metric));
 
-            public Dictionary<string, Series> InitialSeries { get; private set; }
+            //new receive handler for the TogglePause message type
+            Receive<TogglePause>(
+                                 pause =>
+                                 {
+                                     SetPauseButtonText(true);
+                                     BecomeStacked(Paused);
+                                 });
         }
 
-        /// <summary>
-        ///     Add a new <see cref="Series" /> to the chart
-        /// </summary>
-        public class AddSeries
+        private void Paused()
         {
-            public AddSeries(Series series)
-            {
-                Series = series;
-            }
-
-            public Series Series { get; private set; }
+            Receive<Metric>(metric => this.HandleMetricsPaused(metric));
+            Receive<TogglePause>(
+                                 pause =>
+                                 {
+                                     SetPauseButtonText(false);
+                                     UnbecomeStacked();
+                                 });
         }
 
-        /// <summary>
-        /// Remove an existing <see cref="Series"/> from the chart
-        /// </summary>
-        public class RemoveSeries
+        private void HandleMetricsPaused(Metric metric)
         {
-            public RemoveSeries(string seriesName)
+            if (!string.IsNullOrEmpty(metric.Series) &&
+                _seriesIndex.ContainsKey(metric.Series))
             {
-                SeriesName = seriesName;
+                var series = _seriesIndex[metric.Series];
+                series.Points.AddXY(xPosCounter++, 0.0d); //set the Y value to zero when we're paused
+                while (series.Points.Count > MaxPoints)
+                {
+                    series.Points.RemoveAt(0);
+                }
+                SetChartBoundaries();
             }
-
-            public string SeriesName { get; private set; }
         }
 
         private void HandleAddSeries(AddSeries series)
@@ -90,7 +95,7 @@
             {
                 //swap the two series out
                 _seriesIndex = ic.InitialSeries;
-            }  
+            }
 
             // delete any existing series
             _chart.Series.Clear();
@@ -135,7 +140,10 @@
             {
                 var series = _seriesIndex[metric.Series];
                 series.Points.AddXY(xPosCounter++, metric.CounterValue);
-                while (series.Points.Count > MaxPoints) series.Points.RemoveAt(0);
+                while (series.Points.Count > MaxPoints)
+                {
+                    series.Points.RemoveAt(0);
+                }
                 SetChartBoundaries();
             }
         }
@@ -157,6 +165,55 @@
                 area.AxisY.Minimum = minAxisY;
                 area.AxisY.Maximum = maxAxisY;
             }
+        }
+
+        private void SetPauseButtonText(bool paused)
+        {
+            _pauseButton.Text = string.Format("{0}", !paused ? "Pause ||" : "Resume ->");
+        }
+
+        public class InitializeChart
+        {
+            public InitializeChart(Dictionary<string, Series> initialSeries)
+            {
+                InitialSeries = initialSeries;
+            }
+
+            public Dictionary<string, Series> InitialSeries { get; private set; }
+        }
+
+        /// <summary>
+        ///     Toggles the pausing between charts
+        /// </summary>
+        public class TogglePause
+
+        {
+        }
+
+        /// <summary>
+        ///     Add a new <see cref="Series" /> to the chart
+        /// </summary>
+        public class AddSeries
+        {
+            public AddSeries(Series series)
+            {
+                Series = series;
+            }
+
+            public Series Series { get; private set; }
+        }
+
+        /// <summary>
+        ///     Remove an existing <see cref="Series" /> from the chart
+        /// </summary>
+        public class RemoveSeries
+        {
+            public RemoveSeries(string seriesName)
+            {
+                SeriesName = seriesName;
+            }
+
+            public string SeriesName { get; private set; }
         }
     }
 }
